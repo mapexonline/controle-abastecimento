@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Controle de Abastecimento</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background-color: #0859fa;
+        font-family: "Segoe UI", sans-serif;
+        padding: 40px 10px;
+      }
+      .aba-ativa {
+        background-color: #2563eb;
+        color: white;
+      }
+      .aba-inativa {
+        background-color: #e5e7eb;
+        color: #374151;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="max-w-3xl mx-auto bg-white p-6 rounded-xl shadow">
+      <h1 class="text-2xl font-bold text-center text-blue-700 mb-4">
+        Controle de Abastecimento
+      </h1>
+
+      <div class="flex justify-between mb-4">
+        <button
+          id="aba-receitas"
+          class="aba-ativa px-4 py-2 rounded-t-lg font-semibold"
+        >
+          Receitas
+        </button>
+        <button
+          id="aba-despesas"
+          class="aba-inativa px-4 py-2 rounded-t-lg font-semibold"
+        >
+          Despesas
+        </button>
+      </div>
+
+      <div
+        class="bg-green-100 text-green-800 p-3 mb-4 rounded font-bold text-center"
+        id="saldo"
+      >
+        Saldo Atual: R$ 0,00
+      </div>
+
+      <form
+        id="form-transacao"
+        class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6"
+      >
+        <input type="date" id="data" required class="border p-2 rounded" />
+        <input
+          type="text"
+          id="valor"
+          placeholder="Valor (ex: 920,20)"
+          required
+          class="border p-2 rounded"
+        />
+        <select id="tipo" required class="border p-2 rounded">
+          <option value="receita">Receita</option>
+          <option value="despesa">Despesa</option>
+        </select>
+        <input
+          type="text"
+          id="descricao"
+          placeholder="Descrição"
+          required
+          class="border p-2 rounded"
+        />
+        <button
+          type="submit"
+          class="col-span-1 sm:col-span-2 bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 rounded"
+        >
+          Adicionar Transação
+        </button>
+      </form>
+
+      <div id="receitas-box" class="space-y-4"></div>
+      <div id="despesas-box" class="space-y-4 hidden"></div>
+
+      <button
+        id="btn-agrupar"
+        class="mt-4 w-full bg-purple-600 text-white font-bold py-2 rounded hidden"
+      >
+        Agrupar Selecionados
+      </button>
+
+      <footer class="text-center text-sm text-gray-500 mt-10">
+        Desenvolvido por:
+        <a href="mailto:mapexonline22@gmail.com" class="underline"
+          >mapexonline22@gmail.com</a
+        >
+      </footer>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyA-2bGtSflRF9P8NKU1eU8BKkP-7Qw_16Y",
+        authDomain: "abastecimento-gol-g5.firebaseapp.com",
+        projectId: "abastecimento-gol-g5",
+        storageBucket: "abastecimento-gol-g5.appspot.com",
+        messagingSenderId: "81851082020",
+        appId: "1:81851082020:web:18f77851d1b24ec6147fb1",
+        measurementId: "G-50BH0CM5F1",
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+      const mesesOrdenados = [
+        "Janeiro",
+        "Fevereiro",
+        "Março",
+        "Abril",
+        "Maio",
+        "Junho",
+        "Julho",
+        "Agosto",
+        "Setembro",
+        "Outubro",
+        "Novembro",
+        "Dezembro",
+      ];
+      let selecionados = [];
+
+      function criarPainelMes(mesNome, container) {
+        const titulo = document.createElement("h3");
+        titulo.textContent = "🗓️ " + mesNome;
+        titulo.className = "text-lg font-semibold text-gray-600 mt-6 mb-2";
+        container.appendChild(titulo);
+      }
+
+      async function carregarTransacoes(tipoAtual = "receita") {
+        const saldoEl = document.getElementById("saldo");
+        const receitasBox = document.getElementById("receitas-box");
+        const despesasBox = document.getElementById("despesas-box");
+        receitasBox.innerHTML = "";
+        despesasBox.innerHTML = "";
+        const gruposReceita = {},
+          gruposDespesa = {};
+        let totalReceitas = 0,
+          totalDespesas = 0;
+        selecionados = [];
+
+        const querySnapshot = await db.collection("transacoes").get();
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const mesNumero = parseInt(data.data.split("-")[1]);
+          const nomeMes = mesesOrdenados[mesNumero - 1];
+          const div = document.createElement("div");
+          div.className =
+            "flex justify-between items-center bg-white p-3 rounded shadow border";
+          div.innerHTML = `
+          <div>
+            <div class="font-bold text-${
+              data.tipo === "receita" ? "green" : "red"
+            }-600">${data.tipo.toUpperCase()}</div>
+            <div>${parseFloat(data.valor).toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })}</div>
+            <div class="text-sm text-gray-500">${data.descricao}</div>
+          </div>
+          <div class="flex gap-2">
+            <input type="checkbox" onchange="toggleSelecionado('${doc.id}', '${
+            data.tipo
+          }', this.checked)">
+            <button onclick="editarTransacao('${
+              doc.id
+            }')" class="text-yellow-600">✏️</button>
+            <button onclick="excluirTransacao('${
+              doc.id
+            }')" class="text-red-600">🗑️</button>
+          </div>`;
+
+          if (data.tipo === "receita") {
+            if (!gruposReceita[nomeMes]) gruposReceita[nomeMes] = [];
+            gruposReceita[nomeMes].push(div);
+            totalReceitas += parseFloat(data.valor);
+          } else {
+            if (!gruposDespesa[nomeMes]) gruposDespesa[nomeMes] = [];
+            gruposDespesa[nomeMes].push(div);
+            totalDespesas += parseFloat(data.valor);
+          }
+        });
+
+        saldoEl.innerText = `Saldo Atual: ${(
+          totalReceitas - totalDespesas
+        ).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`;
+
+        if (tipoAtual === "receita") {
+          receitasBox.classList.remove("hidden");
+          despesasBox.classList.add("hidden");
+          mesesOrdenados.forEach((mes) => {
+            if (gruposReceita[mes] && gruposReceita[mes].length) {
+              criarPainelMes(mes, receitasBox);
+              gruposReceita[mes].forEach((div) => receitasBox.appendChild(div));
+            }
+          });
+        }
+
+        if (tipoAtual === "despesa") {
+          receitasBox.classList.add("hidden");
+          despesasBox.classList.remove("hidden");
+          mesesOrdenados.forEach((mes) => {
+            if (gruposDespesa[mes] && gruposDespesa[mes].length) {
+              criarPainelMes(mes, despesasBox);
+              gruposDespesa[mes].forEach((div) => despesasBox.appendChild(div));
+            }
+          });
+        }
+      }
+
+      function toggleSelecionado(id, tipo, checked) {
+        if (checked) {
+          selecionados.push({ id, tipo });
+        } else {
+          selecionados = selecionados.filter((s) => s.id !== id);
+        }
+        const tipos = selecionados.map((s) => s.tipo);
+        const mesmoTipo = tipos.every((v, i, a) => v === a[0]);
+        document.getElementById("btn-agrupar").style.display =
+          selecionados.length > 1 && mesmoTipo ? "block" : "none";
+      }
+
+      async function agruparSelecionados() {
+        if (selecionados.length < 2) return;
+        const tipoAgrupado = selecionados[0].tipo;
+        let valorTotal = 0;
+        for (const sel of selecionados) {
+          const doc = await db.collection("transacoes").doc(sel.id).get();
+          valorTotal += parseFloat(doc.data().valor);
+          await db.collection("transacoes").doc(sel.id).delete();
+        }
+        await db.collection("transacoes").add({
+          data: new Date().toISOString().split("T")[0],
+          valor: valorTotal,
+          tipo: tipoAgrupado,
+          descricao: "Agrupamento",
+        });
+        carregarTransacoes(tipoAgrupado);
+      }
+
+      async function excluirTransacao(id) {
+        await db.collection("transacoes").doc(id).delete();
+        carregarTransacoes();
+      }
+
+      async function editarTransacao(id) {
+        const novoValor = prompt("Novo valor:");
+        const novaDescricao = prompt("Nova descrição:");
+        if (novoValor && novaDescricao) {
+          await db
+            .collection("transacoes")
+            .doc(id)
+            .update({
+              valor: parseFloat(novoValor.replace(",", ".")),
+              descricao: novaDescricao,
+            });
+          carregarTransacoes();
+        }
+      }
+
+      document
+        .getElementById("form-transacao")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const data = document.getElementById("data").value;
+          const valor = parseFloat(
+            document.getElementById("valor").value.replace(",", ".")
+          );
+          const tipo = document.getElementById("tipo").value;
+          const descricao = document.getElementById("descricao").value;
+          await db
+            .collection("transacoes")
+            .add({ data, valor, tipo, descricao });
+          e.target.reset();
+          carregarTransacoes(tipo);
+        });
+
+      document.getElementById("aba-receitas").addEventListener("click", () => {
+        document.getElementById("aba-receitas").className =
+          "aba-ativa px-4 py-2 rounded-t-lg font-semibold";
+        document.getElementById("aba-despesas").className =
+          "aba-inativa px-4 py-2 rounded-t-lg font-semibold";
+        document.getElementById("tipo").value = "receita";
+        carregarTransacoes("receita");
+      });
+
+      document.getElementById("aba-despesas").addEventListener("click", () => {
+        document.getElementById("aba-despesas").className =
+          "aba-ativa px-4 py-2 rounded-t-lg font-semibold";
+        document.getElementById("aba-receitas").className =
+          "aba-inativa px-4 py-2 rounded-t-lg font-semibold";
+        document.getElementById("tipo").value = "despesa";
+        carregarTransacoes("despesa");
+      });
+
+      document
+        .getElementById("btn-agrupar")
+        .addEventListener("click", agruparSelecionados);
+
+      carregarTransacoes();
+    </script>
+  </body>
+</html>
