@@ -25,11 +25,50 @@
     </style>
   </head>
   <body>
-    <div class="max-w-3xl mx-auto bg-white p-6 rounded-xl shadow">
-      <h1 class="text-2xl font-bold text-center text-blue-700 mb-4">
-        Controle de Abastecimento
-      </h1>
-
+    <div
+      id="auth-container"
+      class="max-w-md mx-auto bg-white p-8 rounded-xl shadow mt-16 hidden"
+    >
+      <h2 class="text-2xl text-center font-bold text-blue-600 mb-6">Login</h2>
+      <form id="login-form" class="space-y-4">
+        <input
+          type="email"
+          id="login-email"
+          placeholder="Seu email"
+          required
+          class="border p-2 rounded w-full"
+        />
+        <input
+          type="password"
+          id="login-password"
+          placeholder="Sua senha"
+          required
+          class="border p-2 rounded w-full"
+        />
+        <button
+          type="submit"
+          class="w-full bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 rounded"
+        >
+          Entrar
+        </button>
+      </form>
+      <div id="login-error" class="text-red-600 text-center mt-2"></div>
+    </div>
+    <div
+      id="app-container"
+      class="max-w-3xl mx-auto bg-white p-6 rounded-xl shadow hidden"
+    >
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-bold text-blue-700">
+          Controle de Abastecimento
+        </h1>
+        <button
+          id="logout-btn"
+          class="bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded"
+        >
+          Sair
+        </button>
+      </div>
       <div class="flex justify-between mb-4">
         <button
           id="aba-receitas"
@@ -44,14 +83,12 @@
           Despesas
         </button>
       </div>
-
       <div
         class="bg-green-100 text-green-800 p-3 mb-4 rounded font-bold text-center"
         id="saldo"
       >
         Saldo Atual: R$ 0,00
       </div>
-
       <form
         id="form-transacao"
         class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6"
@@ -82,17 +119,14 @@
           Adicionar Transação
         </button>
       </form>
-
       <div id="receitas-box" class="space-y-4"></div>
       <div id="despesas-box" class="space-y-4 hidden"></div>
-
       <button
         id="btn-agrupar"
         class="mt-4 w-full bg-purple-600 text-white font-bold py-2 rounded hidden"
       >
         Agrupar Selecionados
       </button>
-
       <footer class="text-center text-sm text-gray-500 mt-10">
         Desenvolvido por:
         <a href="mailto:mapexonline22@gmail.com" class="underline"
@@ -100,11 +134,12 @@
         >
       </footer>
     </div>
-
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script>
+      // 1. Configuração do Firebase
       const firebaseConfig = {
         apiKey: "AIzaSyA-2bGtSflRF9P8NKU1eU8BKkP-7Qw_16Y",
         authDomain: "abastecimento-gol-g5.firebaseapp.com",
@@ -114,9 +149,47 @@
         appId: "1:81851082020:web:18f77851d1b24ec6147fb1",
         measurementId: "G-50BH0CM5F1",
       };
-
       firebase.initializeApp(firebaseConfig);
       const db = firebase.firestore();
+      const auth = firebase.auth();
+      // 2. Elementos
+      const authContainer = document.getElementById("auth-container");
+      const appContainer = document.getElementById("app-container");
+      const loginForm = document.getElementById("login-form");
+      const loginError = document.getElementById("login-error");
+      const logoutBtn = document.getElementById("logout-btn");
+      // 3. Autenticação
+      auth.onAuthStateChanged((user) => {
+        if (user) {
+          // Logado
+          authContainer.classList.add("hidden");
+          appContainer.classList.remove("hidden");
+          carregarTransacoes();
+        } else {
+          // Não logado
+          appContainer.classList.add("hidden");
+          authContainer.classList.remove("hidden");
+        }
+      });
+      if (loginForm) {
+        loginForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          loginError.textContent = "";
+          const email = document.getElementById("login-email").value;
+          const password = document.getElementById("login-password").value;
+          try {
+            await auth.signInWithEmailAndPassword(email, password);
+          } catch (err) {
+            loginError.textContent = "Email ou senha inválidos!";
+          }
+        });
+      }
+      if (logoutBtn) {
+        logoutBtn.addEventListener("click", async () => {
+          await auth.signOut();
+        });
+      }
+      // 4. Código do app (controle de receitas/despesas)
       const mesesOrdenados = [
         "Janeiro",
         "Fevereiro",
@@ -132,14 +205,12 @@
         "Dezembro",
       ];
       let selecionados = [];
-
       function criarPainelMes(mesNome, container) {
         const titulo = document.createElement("h3");
         titulo.textContent = "🗓️ " + mesNome;
         titulo.className = "text-lg font-semibold text-gray-600 mt-6 mb-2";
         container.appendChild(titulo);
       }
-
       async function carregarTransacoes(tipoAtual = "receita") {
         const saldoEl = document.getElementById("saldo");
         const receitasBox = document.getElementById("receitas-box");
@@ -151,7 +222,6 @@
         let totalReceitas = 0,
           totalDespesas = 0;
         selecionados = [];
-
         const querySnapshot = await db.collection("transacoes").get();
         querySnapshot.forEach((doc) => {
           const data = doc.data();
@@ -161,28 +231,27 @@
           div.className =
             "flex justify-between items-center bg-white p-3 rounded shadow border";
           div.innerHTML = `
-          <div>
-            <div class="font-bold text-${
-              data.tipo === "receita" ? "green" : "red"
-            }-600">${data.tipo.toUpperCase()}</div>
-            <div>${parseFloat(data.valor).toLocaleString("pt-BR", {
-              style: "currency",
-              currency: "BRL",
-            })}</div>
-            <div class="text-sm text-gray-500">${data.descricao}</div>
-          </div>
-          <div class="flex gap-2">
-            <input type="checkbox" onchange="toggleSelecionado('${doc.id}', '${
-            data.tipo
-          }', this.checked)">
-            <button onclick="editarTransacao('${
-              doc.id
-            }')" class="text-yellow-600">✏️</button>
-            <button onclick="excluirTransacao('${
-              doc.id
-            }')" class="text-red-600">🗑️</button>
-          </div>`;
-
+            <div>
+              <div class="font-bold text-${
+                data.tipo === "receita" ? "green" : "red"
+              }-600">${data.tipo.toUpperCase()}</div>
+              <div>${parseFloat(data.valor).toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}</div>
+              <div class="text-sm text-gray-500">${data.descricao}</div>
+            </div>
+            <div class="flex gap-2">
+              <input type="checkbox" onchange="toggleSelecionado('${
+                doc.id
+              }', '${data.tipo}', this.checked)">
+              <button onclick="editarTransacao('${
+                doc.id
+              }')" class="text-yellow-600">✏️</button>
+              <button onclick="excluirTransacao('${
+                doc.id
+              }')" class="text-red-600">🗑️</button>
+            </div>`;
           if (data.tipo === "receita") {
             if (!gruposReceita[nomeMes]) gruposReceita[nomeMes] = [];
             gruposReceita[nomeMes].push(div);
@@ -193,11 +262,9 @@
             totalDespesas += parseFloat(data.valor);
           }
         });
-
         saldoEl.innerText = `Saldo Atual: ${(
           totalReceitas - totalDespesas
         ).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`;
-
         if (tipoAtual === "receita") {
           receitasBox.classList.remove("hidden");
           despesasBox.classList.add("hidden");
@@ -208,7 +275,6 @@
             }
           });
         }
-
         if (tipoAtual === "despesa") {
           receitasBox.classList.add("hidden");
           despesasBox.classList.remove("hidden");
@@ -220,8 +286,7 @@
           });
         }
       }
-
-      function toggleSelecionado(id, tipo, checked) {
+      window.toggleSelecionado = function (id, tipo, checked) {
         if (checked) {
           selecionados.push({ id, tipo });
         } else {
@@ -231,9 +296,8 @@
         const mesmoTipo = tipos.every((v, i, a) => v === a[0]);
         document.getElementById("btn-agrupar").style.display =
           selecionados.length > 1 && mesmoTipo ? "block" : "none";
-      }
-
-      async function agruparSelecionados() {
+      };
+      window.agruparSelecionados = async function () {
         if (selecionados.length < 2) return;
         const tipoAgrupado = selecionados[0].tipo;
         let valorTotal = 0;
@@ -249,14 +313,12 @@
           descricao: "Agrupamento",
         });
         carregarTransacoes(tipoAgrupado);
-      }
-
-      async function excluirTransacao(id) {
+      };
+      window.excluirTransacao = async function (id) {
         await db.collection("transacoes").doc(id).delete();
         carregarTransacoes();
-      }
-
-      async function editarTransacao(id) {
+      };
+      window.editarTransacao = async function (id) {
         const novoValor = prompt("Novo valor:");
         const novaDescricao = prompt("Nova descrição:");
         if (novoValor && novaDescricao) {
@@ -269,8 +331,7 @@
             });
           carregarTransacoes();
         }
-      }
-
+      };
       document
         .getElementById("form-transacao")
         .addEventListener("submit", async (e) => {
@@ -287,7 +348,6 @@
           e.target.reset();
           carregarTransacoes(tipo);
         });
-
       document.getElementById("aba-receitas").addEventListener("click", () => {
         document.getElementById("aba-receitas").className =
           "aba-ativa px-4 py-2 rounded-t-lg font-semibold";
@@ -296,7 +356,6 @@
         document.getElementById("tipo").value = "receita";
         carregarTransacoes("receita");
       });
-
       document.getElementById("aba-despesas").addEventListener("click", () => {
         document.getElementById("aba-despesas").className =
           "aba-ativa px-4 py-2 rounded-t-lg font-semibold";
@@ -305,12 +364,9 @@
         document.getElementById("tipo").value = "despesa";
         carregarTransacoes("despesa");
       });
-
       document
         .getElementById("btn-agrupar")
-        .addEventListener("click", agruparSelecionados);
-
-      carregarTransacoes();
+        .addEventListener("click", () => agruparSelecionados());
     </script>
   </body>
 </html>
